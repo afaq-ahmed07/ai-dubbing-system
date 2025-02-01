@@ -1,7 +1,5 @@
 import streamlit as st
 import whisper
-import io
-from pydub import AudioSegment
 
 # Load Whisper model once
 @st.cache_resource
@@ -10,26 +8,14 @@ def load_whisper_model():
 
 model = load_whisper_model()
 
-# Function to convert any uploaded audio to WAV format
-def convert_to_wav(uploaded_file):
-    audio_bytes = uploaded_file.read()
-    audio = AudioSegment.from_file(io.BytesIO(audio_bytes))  # Auto-detects format
-    wav_io = io.BytesIO()
-    audio.export(wav_io, format="wav")  # Convert to WAV
-    wav_io.seek(0)
-    return wav_io
-
 st.title("Whisper AI Local Transcription")
 
-uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "flac", "m4a"])
+uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "flac"])
 
 if uploaded_file is not None:
     st.audio(uploaded_file, format="audio/mp3")
 
     if st.button("Transcribe"):
-        with st.spinner("Converting audio (if needed)..."):
-            audio_wav = convert_to_wav(uploaded_file)
-
         with st.spinner("Transcribing..."):
             # Load and process audio
             audio = whisper.load_audio(audio_wav)
