@@ -1,5 +1,7 @@
 import streamlit as st
 import whisper
+import tempfile
+import os
 
 # Load Whisper model once
 @st.cache_resource
@@ -10,25 +12,35 @@ model = load_whisper_model()
 
 st.title("Whisper AI Local Transcription")
 
-uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "flac"])
+uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "flac", "m4a"])
 
 if uploaded_file is not None:
-    st.audio(uploaded_file, format="audio/mp3")
+    st.audio(uploaded_file, format=f"audio/{uploaded_file.type.split('/')[-1]}")
 
     if st.button("Transcribe"):
         with st.spinner("Transcribing..."):
-            # Load and process audio
-            audio = whisper.load_audio(audio_wav)
-            audio = whisper.pad_or_trim(audio)
-            mel = whisper.log_mel_spectrogram(audio).to(model.device)
+            # Save the uploaded file as a temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+                temp_audio_path = temp_audio.name
+                temp_audio.write(uploaded_file.read())
 
-            # Detect language
-            _, probs = model.detect_language(mel)
-            detected_lang = max(probs, key=probs.get)
+            try:
+                # Load the audio file directly using Whisper
+                audio = whisper.load_audio(temp_audio_path)
+                audio = whisper.pad_or_trim(audio)
+                mel = whisper.log_mel_spectrogram(audio).to(model.device)
 
-            # Transcribe
-            options = whisper.DecodingOptions()
-            result = whisper.decode(model, mel, options)
+                # Detect language
+                _, probs = model.detect_language(mel)
+                detected_lang = max(probs, key=probs.get)
 
-            st.success(f"Detected Language: {detected_lang.upper()}")
-            st.text_area("Transcription", result.text, height=200)
+                # Transcribe
+                options = whisper.DecodingOptions()
+                result = whisper.decode(model, mel, options)
+
+                st.success(f"Detected Language: {detected_lang.upper()}")
+                st.text_area("Transcription", result.text, height=200)
+
+            finally:
+                # Cleanup temporary file
+                os.remove(temp_audio_path)
