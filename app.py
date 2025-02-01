@@ -35,12 +35,29 @@ if uploaded_file is not None:
                 detected_lang = max(probs, key=probs.get)
 
                 # Transcribe
-                options = whisper.DecodingOptions()
-                result = whisper.decode(model, mel, options)
-
+                result = model.transcribe(temp_audio_path)
+                transcription_text = result["text"]
+                
                 st.success(f"Detected Language: {detected_lang.upper()}")
-                st.text_area("Transcription", result.text, height=200)
+                st.text_area("Transcription", transcription_text, height=200)
+
+                # Create a temporary text file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as temp_txt:
+                    temp_txt_path = temp_txt.name
+                    temp_txt.write(transcription_text.encode("utf-8"))
+                    temp_txt.flush()
+
+                # Provide download button
+                with open(temp_txt_path, "rb") as f:
+                    st.download_button(
+                        label="Download Transcription",
+                        data=f,
+                        file_name="transcription.txt",
+                        mime="text/plain"
+                    )
 
             finally:
-                # Cleanup temporary file
+                # Cleanup temporary files
                 os.remove(temp_audio_path)
+                if 'temp_txt_path' in locals():
+                    os.remove(temp_txt_path)
