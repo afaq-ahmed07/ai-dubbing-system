@@ -9,6 +9,7 @@ from translate_utils import get_supported_languages, translate_text
 model = load_whisper_model()
 
 # Function to handle translation and display
+# Function to handle translation and display
 def handle_translation(transcription_text):
     """
     Handles the translation process and displays the translated text and download button.
@@ -18,7 +19,11 @@ def handle_translation(transcription_text):
                 
     # Create a mapping for display: Language Name (Title Case) -> Language Code
     lang_options = {name.title(): code for code, name in supported_langs.items()}
-    selected_lang = st.selectbox("Select target language", sorted(lang_options.keys()))
+    
+    # Set Urdu as the default language if available
+    default_lang = "Urdu" if "Urdu" in lang_options else None
+
+    selected_lang = st.selectbox("Select target language", sorted(lang_options.keys()), index=list(lang_options.keys()).index(default_lang) if default_lang else 0)
 
     # Button to trigger translation
     if st.button("Translate Text"):
@@ -35,6 +40,7 @@ def handle_translation(transcription_text):
                 file_name="translated.txt",
                 mime="text/plain"
             )
+
 
 st.title("Whisper AI Local Transcription & Translation")
 
