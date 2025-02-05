@@ -1,3 +1,4 @@
 streamlit
 openai-whisper
 torch
+audio-recorder-streamlit
