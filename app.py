@@ -3,6 +3,7 @@ import whisper
 import tempfile
 import os
 from audio_recorder_streamlit import audio_recorder
+from moviepy import VideoFileClip  # Used to extract audio from video
 
 # Load the Whisper model once
 @st.cache_resource
@@ -13,10 +14,12 @@ model = load_whisper_model()
 
 st.title("Whisper AI Local Transcription")
 
-# Let user choose between uploading a file or recording audio in real time
-input_method = st.radio("Select Input Method", ("Upload Audio File", "Record Audio"))
+# Let user choose input method
+input_method = st.radio("Select Input Method", ("Upload Audio File", "Record Audio", "Upload Video File"))
 
 audio_data = None
+temp_video_path = None  # To store temporary video file path if needed
+temp_audio_video_path = None  # For audio extracted from video
 
 if input_method == "Upload Audio File":
     uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "flac", "m4a"])
@@ -31,6 +34,27 @@ elif input_method == "Record Audio":
     if audio_bytes is not None:
         audio_data = audio_bytes
         st.audio(audio_bytes, format="audio/wav")
+elif input_method == "Upload Video File":
+    video_file = st.file_uploader("Upload a video file", type=["mp4", "mov", "avi", "mkv"])
+    if video_file is not None:
+        # Save the uploaded video to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_video:
+            temp_video_path = temp_video.name
+            temp_video.write(video_file.read())
+        st.write("Extracting audio from video...")
+        try:
+            # Use MoviePy to extract audio from the video file
+            clip = VideoFileClip(temp_video_path)
+            # Save the extracted audio to a temporary file in WAV format
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_video:
+                temp_audio_video_path = temp_audio_video.name
+            clip.audio.write_audiofile(temp_audio_video_path, logger=None)
+            # Read the extracted audio data
+            with open(temp_audio_video_path, "rb") as f:
+                audio_data = f.read()
+            st.audio(audio_data, format="audio/wav")
+        except Exception as e:
+            st.error(f"Error extracting audio: {e}")
 
 def format_timestamp_srt(seconds: float) -> str:
     """Convert seconds to SRT timestamp format: HH:MM:SS,mmm"""
@@ -107,7 +131,6 @@ if audio_data is not None:
                         file_name="subtitles.srt",
                         mime="text/srt"
                     )
-
             finally:
                 # Clean up temporary files
                 os.remove(temp_audio_path)
@@ -115,3 +138,8 @@ if audio_data is not None:
                     os.remove(temp_txt_path)
                 if 'temp_srt_path' in locals():
                     os.remove(temp_srt_path)
+                # Clean up video/audio extraction temporary files if they exist
+                if temp_video_path is not None and os.path.exists(temp_video_path):
+                    os.remove(temp_video_path)
+                if temp_audio_video_path is not None and os.path.exists(temp_audio_video_path):
+                    os.remove(temp_audio_video_path)
