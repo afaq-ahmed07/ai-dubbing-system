@@ -4,3 +4,4 @@ torch
 audio-recorder-streamlit
 moviepy
 googletrans==4.0.0-rc1
+pyht

@@ -1,48 +1,99 @@
 import streamlit as st
 import os
+from pyht import Client
+from pyht.client import TTSOptions
 from whisper_utils import load_whisper_model, transcribe_audio
 from file_utils import save_audio_temp, extract_audio_from_video
 from ui_components import get_user_input
 from translate_utils import get_supported_languages, translate_text
+from pyht  import Language # Import Language
+
 
 # Load Whisper model
 model = load_whisper_model()
 
-# Function to handle translation and display
-# Function to handle translation and display
-def handle_translation(transcription_text):
-    """
-    Handles the translation process and displays the translated text and download button.
-    """
+# Session state to store intermediate results
+if "transcription_text" not in st.session_state:
+    st.session_state.transcription_text = None
+if "translated_text" not in st.session_state:
+    st.session_state.translated_text = None
+
+
+def text_to_speech_playht(text):
+    """Generate speech from text using Play.ht streaming API via pyht."""
+    # Initialize the Play.ht client
+    print("entered function")
+    client = Client(
+        user_id="71n2353Y66cvZ1YxfVaooM5dGAx2",  # Replace with your actual Play.ht User ID
+        api_key="b59821992ba64324af0821e2c90717bd",  # Replace with your actual Play.ht API Key
+    )
+    language="English"
+    # Set TTS options
+    options = TTSOptions(voice="s3://voice-cloning-zero-shot/775ae416-49bb-4fb6-bd45-740f205d20a1/jennifersaad/manifest.json",language=Language.URDU)  # Ensure the language is in uppercase)
+
+    try:
+        # Open a file to save the audio
+        audio_filename = "output.mp3"
+        with open(audio_filename, "wb") as audio_file:
+            # Stream the audio and save it to a file
+            for chunk in client.tts(text, options):
+                audio_file.write(chunk)
+
+        print(f"Audio saved to {audio_filename}")
+        return audio_filename  # Return the saved file path
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        return None
+
+
+def handle_translation():
+    """Handles the translation process and stores the translated text in session state."""
+    if not st.session_state.transcription_text:
+        st.warning("Please transcribe the audio first.")
+        return
+
     st.markdown("### Translate Transcription")
     supported_langs = get_supported_languages()
-                
-    # Create a mapping for display: Language Name (Title Case) -> Language Code
+
     lang_options = {name.title(): code for code, name in supported_langs.items()}
-    
-    # Set Urdu as the default language if available
     default_lang = "Urdu" if "Urdu" in lang_options else None
 
-    selected_lang = st.selectbox("Select target language", sorted(lang_options.keys()), index=list(lang_options.keys()).index(default_lang) if default_lang else 0)
+    selected_lang = st.selectbox("Select target language", sorted(lang_options.keys()),
+                                 index=list(lang_options.keys()).index(default_lang) if default_lang else 0)
 
-    # Button to trigger translation
-    if st.button("Translate Text"):
-        target_lang_code = lang_options[selected_lang]
+    if st.button("Translate"):
         with st.spinner("Translating..."):
-            translated_text = translate_text(transcription_text, target_lang_code)
-            st.success(f"Translation to {selected_lang}:")
-            st.text_area("Translated Text", translated_text, height=200)
-        
+            target_lang_code = lang_options[selected_lang]
+            st.session_state.translated_text = translate_text(st.session_state.transcription_text, target_lang_code)
+            st.success(f"Translated to {selected_lang}:")
+            st.text_area("Translated Text", st.session_state.translated_text, height=200)
+
             # Provide a download button for the translated text
-            st.download_button(
-                "Download Translated Text",
-                data=translated_text,
-                file_name="translated.txt",
-                mime="text/plain"
-            )
+            st.download_button("Download Translated Text",
+                               data=st.session_state.translated_text,
+                               file_name="translated.txt",
+                               mime="text/plain")
 
 
-st.title("Whisper AI Local Transcription & Translation")
+def generate_voiceover():
+    print("called")
+    """Generates a voiceover from translated text."""
+    if not st.session_state.translated_text:
+        st.warning("Please translate the text first.")
+        return
+
+    st.markdown("### Generate Voiceover")
+    with st.spinner("Generating voiceover..."):
+        audio_url = text_to_speech_playht(st.session_state.translated_text)
+        if audio_url:
+            st.success("Voiceover Generated Successfully!")
+            st.audio(audio_url, format="audio/mp3")
+            st.button(f"[Download Audio]({audio_url})")
+
+
+# Streamlit UI
+st.title("AI Dubbing System")
 
 # Get user input (audio/video)
 audio_data, video_data = get_user_input()
@@ -51,24 +102,22 @@ if audio_data or video_data:
     if st.button("Transcribe"):
         with st.spinner("Processing..."):
             audio_path = None
-            txt_path = None
-            srt_path = None
             try:
                 # If video file is provided, extract audio; otherwise, save the audio bytes
                 if video_data:
                     audio_path = extract_audio_from_video(video_data)
                 else:
                     audio_path = save_audio_temp(audio_data)
-                
+
                 # Transcribe using Whisper
                 detected_lang, transcription_text, srt_content = transcribe_audio(model, audio_path)
 
-                # Handle cases where transcription failed
                 if not transcription_text:
                     st.error("Failed to transcribe audio. Please try again with a different file.")
                     raise Exception("Transcription failed.")
 
                 st.success(f"Detected Language: {detected_lang.upper()}")
+                st.session_state.transcription_text = transcription_text
                 st.text_area("Transcription", transcription_text, height=200)
 
                 # Save transcription to files
@@ -86,16 +135,20 @@ if audio_data or video_data:
                 with open(srt_path, "rb") as f_srt:
                     st.download_button("Download Subtitles (SRT)", f_srt, file_name="subtitles.srt", mime="text/srt")
 
-                handle_translation(transcription_text)
+
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
             finally:
-                # Cleanup temporary files safely
+                # Cleanup temporary files
                 if audio_path and os.path.exists(audio_path):
                     os.remove(audio_path)
-                if txt_path and os.path.exists(txt_path):
-                    os.remove(txt_path)
-                if srt_path and os.path.exists(srt_path):
-                    os.remove(srt_path)
+
+# Section for translation
+if st.session_state.transcription_text:
+    handle_translation()
+
+# Section for generating voiceover
+if st.session_state.translated_text:
+    generate_voiceover()
