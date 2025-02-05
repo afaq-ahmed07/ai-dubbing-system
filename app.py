@@ -7,10 +7,12 @@ from file_utils import save_audio_temp, extract_audio_from_video
 from ui_components import get_user_input
 from translate_utils import get_supported_languages, translate_text
 from pyht  import Language # Import Language
+import io
 
 
 # Load Whisper model
 model = load_whisper_model()
+os.environ["STREAMLIT_SERVER_ENABLE_FILE_WATCHER"] = "false"
 
 # Session state to store intermediate results
 if "transcription_text" not in st.session_state:
@@ -27,20 +29,21 @@ def text_to_speech_playht(text):
         user_id="71n2353Y66cvZ1YxfVaooM5dGAx2",  # Replace with your actual Play.ht User ID
         api_key="b59821992ba64324af0821e2c90717bd",  # Replace with your actual Play.ht API Key
     )
-    language="English"
     # Set TTS options
     options = TTSOptions(voice="s3://voice-cloning-zero-shot/775ae416-49bb-4fb6-bd45-740f205d20a1/jennifersaad/manifest.json",language=Language.URDU)  # Ensure the language is in uppercase)
 
     try:
-        # Open a file to save the audio
-        audio_filename = "output.mp3"
-        with open(audio_filename, "wb") as audio_file:
-            # Stream the audio and save it to a file
-            for chunk in client.tts(text, options):
-                audio_file.write(chunk)
-
-        print(f"Audio saved to {audio_filename}")
-        return audio_filename  # Return the saved file path
+        # Create a BytesIO object to hold the audio data in memory
+        audio_buffer = io.BytesIO()
+        
+        # Stream the audio chunks and write them to the buffer
+        for chunk in client.tts(text, options):
+            audio_buffer.write(chunk)
+        
+        # Move back to the start of the BytesIO buffer so it can be read later
+        audio_buffer.seek(0)
+        
+        return audio_buffer  # Return the in-memory audio data
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
@@ -69,15 +72,7 @@ def handle_translation():
             st.success(f"Translated to {selected_lang}:")
             st.text_area("Translated Text", st.session_state.translated_text, height=200)
 
-            # Provide a download button for the translated text
-            st.download_button("Download Translated Text",
-                               data=st.session_state.translated_text,
-                               file_name="translated.txt",
-                               mime="text/plain")
-
-
 def generate_voiceover():
-    print("called")
     """Generates a voiceover from translated text."""
     if not st.session_state.translated_text:
         st.warning("Please translate the text first.")
@@ -85,12 +80,17 @@ def generate_voiceover():
 
     st.markdown("### Generate Voiceover")
     with st.spinner("Generating voiceover..."):
-        audio_url = text_to_speech_playht(st.session_state.translated_text)
-        if audio_url:
+        audio_data = text_to_speech_playht(st.session_state.translated_text)
+        if audio_data:
             st.success("Voiceover Generated Successfully!")
-            st.audio(audio_url, format="audio/mp3")
-            st.button(f"[Download Audio]({audio_url})")
-
+            st.audio(audio_data, format="audio/mp3")
+            st.download_button(
+                "Download Audio",
+                data=audio_data,
+                file_name="voiceover.mp3",
+                mime="audio/mp3"
+            )
+    st.stop()
 
 # Streamlit UI
 st.title("AI Dubbing System")
