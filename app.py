@@ -3,11 +3,40 @@ import os
 from whisper_utils import load_whisper_model, transcribe_audio
 from file_utils import save_audio_temp, extract_audio_from_video
 from ui_components import get_user_input
+from translate_utils import get_supported_languages, translate_text
 
 # Load Whisper model
 model = load_whisper_model()
 
-st.title("Whisper AI Local Transcription")
+# Function to handle translation and display
+def handle_translation(transcription_text):
+    """
+    Handles the translation process and displays the translated text and download button.
+    """
+    st.markdown("### Translate Transcription")
+    supported_langs = get_supported_languages()
+                
+    # Create a mapping for display: Language Name (Title Case) -> Language Code
+    lang_options = {name.title(): code for code, name in supported_langs.items()}
+    selected_lang = st.selectbox("Select target language", sorted(lang_options.keys()))
+
+    # Button to trigger translation
+    if st.button("Translate Text"):
+        target_lang_code = lang_options[selected_lang]
+        with st.spinner("Translating..."):
+            translated_text = translate_text(transcription_text, target_lang_code)
+            st.success(f"Translation to {selected_lang}:")
+            st.text_area("Translated Text", translated_text, height=200)
+        
+            # Provide a download button for the translated text
+            st.download_button(
+                "Download Translated Text",
+                data=translated_text,
+                file_name="translated.txt",
+                mime="text/plain"
+            )
+
+st.title("Whisper AI Local Transcription & Translation")
 
 # Get user input (audio/video)
 audio_data, video_data = get_user_input()
@@ -19,7 +48,7 @@ if audio_data or video_data:
             txt_path = None
             srt_path = None
             try:
-                # If video file is provided, extract audio
+                # If video file is provided, extract audio; otherwise, save the audio bytes
                 if video_data:
                     audio_path = extract_audio_from_video(video_data)
                 else:
@@ -42,16 +71,16 @@ if audio_data or video_data:
 
                 with open(txt_path, "w", encoding="utf-8") as txt_file:
                     txt_file.write(transcription_text)
-
                 with open(srt_path, "w", encoding="utf-8") as srt_file:
                     srt_file.write(srt_content)
 
-                # Provide download buttons
+                # Provide download buttons for TXT and SRT files
                 with open(txt_path, "rb") as f_txt:
                     st.download_button("Download Transcription (TXT)", f_txt, file_name="transcription.txt", mime="text/plain")
-
                 with open(srt_path, "rb") as f_srt:
                     st.download_button("Download Subtitles (SRT)", f_srt, file_name="subtitles.srt", mime="text/srt")
+
+                handle_translation(transcription_text)
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
