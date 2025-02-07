@@ -1,14 +1,10 @@
 import streamlit as st
 import os
-from pyht import Client
-from pyht.client import TTSOptions
 from whisper_utils import load_whisper_model, transcribe_audio
-from file_utils import save_audio_temp, extract_audio_from_video
+from file_utils import save_audio_temp, extract_audio_from_video,replace_audio_in_video
 from ui_components import get_user_input
 from translate_utils import get_supported_languages, translate_text
-from pyht  import Language # Import Language
-import io
-
+from generate_voice import text_to_speech_playht
 
 # Load Whisper model
 model = load_whisper_model()
@@ -19,35 +15,6 @@ if "transcription_text" not in st.session_state:
     st.session_state.transcription_text = None
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = None
-
-
-def text_to_speech_playht(text):
-    """Generate speech from text using Play.ht streaming API via pyht."""
-    # Initialize the Play.ht client
-    print("entered function")
-    client = Client(
-        user_id="71n2353Y66cvZ1YxfVaooM5dGAx2",  # Replace with your actual Play.ht User ID
-        api_key="b59821992ba64324af0821e2c90717bd",  # Replace with your actual Play.ht API Key
-    )
-    # Set TTS options
-    options = TTSOptions(voice="s3://voice-cloning-zero-shot/775ae416-49bb-4fb6-bd45-740f205d20a1/jennifersaad/manifest.json",language=Language.URDU)  # Ensure the language is in uppercase)
-
-    try:
-        # Create a BytesIO object to hold the audio data in memory
-        audio_buffer = io.BytesIO()
-        
-        # Stream the audio chunks and write them to the buffer
-        for chunk in client.tts(text, options):
-            audio_buffer.write(chunk)
-        
-        # Move back to the start of the BytesIO buffer so it can be read later
-        audio_buffer.seek(0)
-        
-        return audio_buffer  # Return the in-memory audio data
-
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-        return None
 
 
 def handle_translation():
@@ -73,30 +40,43 @@ def handle_translation():
             st.text_area("Translated Text", st.session_state.translated_text, height=200)
 
 def generate_voiceover():
-    """Generates a voiceover from translated text."""
+    """Generates a voiceover from translated text and replaces the audio in the uploaded video."""
     if not st.session_state.translated_text:
         st.warning("Please translate the text first.")
         return
 
-    st.markdown("### Generate Voiceover")
-    with st.spinner("Generating voiceover..."):
-        audio_data = text_to_speech_playht(st.session_state.translated_text)
-        if audio_data:
-            st.success("Voiceover Generated Successfully!")
-            st.audio(audio_data, format="audio/mp3")
-            st.download_button(
-                "Download Audio",
-                data=audio_data,
-                file_name="voiceover.mp3",
-                mime="audio/mp3"
-            )
+    st.markdown("### Generate Voiceover and Dub Video")
+    
+    # Generate the dubbed audio using Play.ht TTS (returns a BytesIO)
+    dubbed_audio_buffer = text_to_speech_playht(st.session_state.translated_text)
+    if not dubbed_audio_buffer:
+        st.error("Voiceover generation failed.")
+        return
+
+    st.success("Voiceover Generated Successfully!")
+    st.audio(dubbed_audio_buffer, format="audio/mp3")
+    return dubbed_audio_buffer
+    
+def create_dubbed_video(video_data,dubbed_audio_buffer):
+    dubbed_video_path = replace_audio_in_video(video_data, dubbed_audio_buffer)
+    
+    with open(dubbed_video_path, "rb") as video_file:
+        st.download_button(
+            label="Download Dubbed Video",
+            data=video_file,
+            file_name="dubbed_video.mp4",
+            mime="video/mp4"
+        )
+    
     st.stop()
+
+
 
 # Streamlit UI
 st.title("AI Dubbing System")
 
 # Get user input (audio/video)
-audio_data, video_data = get_user_input()
+audio_data, video_data,selected_method = get_user_input()
 
 if audio_data or video_data:
     if st.button("Transcribe"):
@@ -146,9 +126,11 @@ if audio_data or video_data:
                     os.remove(audio_path)
 
 # Section for translation
-if st.session_state.transcription_text:
+if st.session_state.transcription_text and st.session_state.selected_method:
     handle_translation()
 
 # Section for generating voiceover
-if st.session_state.translated_text:
-    generate_voiceover()
+if st.session_state.translated_text and st.session_state.selected_method:
+    dubbed_audio=generate_voiceover()
+    if selected_method=="Upload Video File":
+        create_dubbed_video(video_data=video_data,dubbed_audio_buffer=dubbed_audio)
