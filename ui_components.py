@@ -81,7 +81,7 @@ def get_user_input():
         )
         if selected_method:
             st.session_state.selected_method = selected_method
-            st.experimental_rerun()  # Rerun to hide the radio selection.
+            st.rerun()  # Rerun to hide the radio selection.
     else:
         # If a selection is already made, show the corresponding uploader/recorder.
         audio_data = None
@@ -106,7 +106,7 @@ def get_user_input():
             # Provide a reset button to allow re-selection
             if st.button("Change Selection"):
                 st.session_state.selected_method = None
-                st.experimental_rerun()
+                st.rerun()
         except Exception as e:
             st.error(f"An error occurred: {e}")
         return audio_data, video_data, st.session_state.selected_method
