@@ -58,15 +58,14 @@ def generate_voiceover():
     return dubbed_audio_buffer
     
 def create_dubbed_video(video_data,dubbed_audio_buffer):
-    dubbed_video_path = replace_audio_in_video(video_data, dubbed_audio_buffer)
+    video_bytes = replace_audio_in_video(video_data, dubbed_audio_buffer)
     
-    with open(dubbed_video_path, "rb") as video_file:
-        st.download_button(
-            label="Download Dubbed Video",
-            data=video_file,
-            file_name="dubbed_video.mp4",
-            mime="video/mp4"
-        )
+    st.download_button(
+        label="Download Dubbed Video",
+        data=video_bytes,
+        file_name="dubbed_video.mp4",
+        mime="video/mp4"
+    )
     
     st.stop()
 
