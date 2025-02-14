@@ -1,7 +1,5 @@
-Here's a clean, professional `README.md` for your AI Dubbing System:
-
 ```markdown
-# AI Video Dubbing System 🎥🔊
+### AI Video Dubbing System 🎥🔊
 
 An automated pipeline to transcribe, translate, and dub videos using cutting-edge AI tools.
 
