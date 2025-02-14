@@ -48,13 +48,4 @@ A Streamlit-based AI dubbing system that allows you to:
 2. **Run the App:**
    ```bash
    streamlit run app.py
-## File Structure:
-   /ai_dubbing_system
-   │── app.py                # Main Streamlit application
-   │── whisper_utils.py      # Functions to load the Whisper model and transcribe audio
-   │── file_utils.py         # Functions for file handling and video processing (e.g., replacing audio)
-   │── ui_components.py      # Custom UI components (e.g., input selection and styled radio buttons)
-   │── translate_utils.py    # Functions for translating text using Google Translate API
-   │── requirements.txt      # Project dependencies
-   │── README.md             # This README file
 
