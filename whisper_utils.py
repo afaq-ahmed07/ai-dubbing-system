@@ -3,7 +3,7 @@ import os
 
 def load_whisper_model():
     """Load Whisper model."""
-    return whisper.load_model("small")  # Options: tiny, base, small, medium, large
+    return whisper.load_model("tiny")  # Options: tiny, base, small, medium, large
 
 def format_timestamp_srt(seconds: float) -> str:
     """Convert seconds to SRT timestamp format: HH:MM:SS,mmm"""
